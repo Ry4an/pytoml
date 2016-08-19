@@ -41,12 +41,25 @@ def _main():
     ap = argparse.ArgumentParser()
     ap.add_argument('-d', '--dir', action='append')
     ap.add_argument('-s', '--sort-keys', action='store_true')
+    ap.add_argument('--dict-type')
     ap.add_argument('testcase', nargs='*')
     ap.set_defaults(sort_keys=False)
     args = ap.parse_args()
 
     if not args.dir:
         args.dir = [os.path.join(os.path.split(__file__)[0], 'toml-test/tests')]
+
+    dict_type = dict
+    if args.dict_type:
+        try:
+            parts = args.dict_type.split('.')
+            module = __import__(".".join(parts[:-1]))
+            for part in args.dict_type.split(".")[1:]:
+                module = getattr(module, part)
+            dict_type = module
+        except:
+            print('error: unable to load dict_type: {0}'.format(args.dict_type))
+            return 2
 
     succeeded = []
     failed = []
@@ -66,19 +79,20 @@ def _main():
                 parse_error = None
                 try:
                     with open(os.path.join(top, fname), 'rb') as fin:
-                        parsed = toml.load(fin)
+                        parsed = toml.load(fin, dict_type=dict_type)
                 except toml.TomlError:
                     parsed = None
                     parse_error = sys.exc_info()
                 else:
                     dumped = toml.dumps(parsed, sort_keys=args.sort_keys)
-                    parsed2 = toml.loads(dumped)
+                    parsed2 = toml.loads(dumped, dict_type=dict_type)
                     if parsed != parsed2:
                         failed.append((fname, parsed, parsed2, None))
                         continue
 
                     with open(os.path.join(top, fname), 'rb') as fin:
-                        parsed = toml.load(fin, translate=_testbench_literal)
+                        parsed = toml.load(fin, translate=_testbench_literal,
+                                dict_type=dict_type)
 
                 try:
                     with io.open(os.path.join(top, fname[:-5] + '.json'), 'rt', encoding='utf-8') as fin:
