@@ -6,17 +6,18 @@ if sys.version_info[0] == 2:
 else:
     _chr = chr
 
-def load(fin, translate=lambda t, x, v: v):
-    return loads(fin.read(), translate=translate, filename=fin.name)
+def load(fin, translate=lambda t, x, v: v, dict_type=dict):
+    return loads(fin.read(), translate=translate, filename=fin.name, dict_type=dict_type)
 
-def loads(s, filename='<string>', translate=lambda t, x, v: v):
+def loads(s, filename='<string>', translate=lambda t, x, v: v, dict_type=dict):
     if isinstance(s, bytes):
         s = s.decode('utf-8')
 
     s = s.replace('\r\n', '\n')
 
-    root = {}
-    tables = {}
+    root = dict_type()
+    tables = dict_type()
+
     scope = root
 
     src = _Source(s, filename=filename)
@@ -34,7 +35,7 @@ def loads(s, filename='<string>', translate=lambda t, x, v: v):
                 error('array-type-mismatch')
             value = [process_value(item) for item in value]
         elif kind == 'table':
-            value = dict([(k, process_value(value[k])) for k in value])
+            value = dict_type([(k, process_value(value[k])) for k in value])
         return translate(kind, text, value)
 
     for kind, value, pos in ast:
@@ -50,19 +51,19 @@ def loads(s, filename='<string>', translate=lambda t, x, v: v):
                 if isinstance(cur.get(name), list):
                     d, cur = cur[name][-1]
                 else:
-                    d, cur = cur.setdefault(name, (None, {}))
+                    d, cur = cur.setdefault(name, (None, dict_type()))
 
-            scope = {}
+            scope = dict_type()
             name = value[-1]
             if name not in cur:
                 if is_table_array:
-                    cur[name] = [(scope, {})]
+                    cur[name] = [(scope, dict_type())]
                 else:
-                    cur[name] = (scope, {})
+                    cur[name] = (scope, dict_type())
             elif isinstance(cur[name], list):
                 if not is_table_array:
                     error('table_type_mismatch')
-                cur[name].append((scope, {}))
+                cur[name].append((scope, dict_type()))
             else:
                 if is_table_array:
                     error('table_type_mismatch')
@@ -73,7 +74,7 @@ def loads(s, filename='<string>', translate=lambda t, x, v: v):
 
     def merge_tables(scope, tables):
         if scope is None:
-            scope = {}
+            scope = dict_type()
         for k in tables:
             if k in scope:
                 error('key_table_conflict')
